@@ -21,13 +21,97 @@
 
 ```mermaid
 flowchart LR
-  A[Registros (DynamoDB/RDS)] -->|Step Functions (scheduler diario)| B[SQS FIFO (jobs)]
-  subgraph "Procesamiento"
-    B --> C[Lambda Worker]
-    C --> D[API Interna (2 Lambdas)]
-    C --> E[(Resultados + Logs - DynamoDB)]
+  %% =====================
+  %%  Subgrafos por dominio
+  %% =====================
+
+  subgraph Orquestación
+    direction LR
+    EV["EventBridge (Cron diario)"]
+    SF["Step Functions (Scheduler)"]
+    SCH[Lambda Scheduler]
+    EV --> SF --> SCH
   end
-  B -.-> DLQ((DLQ))
+
+  subgraph Mensajería
+    direction TB
+    SQS[(SQS FIFO Jobs)]:::queue
+    DLQ(((DLQ))):::dlq
+    SQS -. redrive .-> DLQ
+  end
+
+  subgraph "Procesamiento (VPC privada)"
+    direction LR
+    WK[Lambda Worker]:::lambda
+    APIGW["API Gateway (Private)"]:::apigw
+    L1[Lambda A]:::lambda
+    L2[Lambda B]:::lambda
+    VPCE["VPC Endpoints (SQS/DynamoDB/Logs)"]:::vpc
+
+    WK --> APIGW
+    APIGW --> L1
+    APIGW --> L2
+  end
+
+  subgraph "Datos & Analítica"
+    direction TB
+    DDB[(DynamoDB Results)]:::db
+    S3[("S3 Data Lake (opcional)")]:::s3
+    GLUE[Glue Crawler]:::glue
+    ATH[Athena]:::athena
+    DDB -. export / streams .- S3
+    GLUE --> ATH
+  end
+
+  subgraph "Observabilidad & Seguridad"
+    direction TB
+    CW[CloudWatch Logs & Metrics]:::obs
+    XR[X-Ray Tracing]:::obs
+    SM[Secrets Manager]:::sec
+    PS[Parameter Store]:::sec
+    KMS[KMS CMKs]:::sec
+  end
+
+  %% =====================
+  %%  Relaciones entre dominios
+  %% =====================
+
+  SCH --> SQS
+  SQS --> WK
+
+  %% Persistencia
+  WK --> DDB
+
+  %% Observabilidad
+  WK -. logs/metrics .-> CW
+  L1 -. logs .-> CW
+  L2 -. logs .-> CW
+  WK -. traces .-> XR
+  L1 -. traces .-> XR
+  L2 -. traces .-> XR
+
+  %% Configuración / secretos
+  SM --> WK
+  PS --> WK
+
+  %% Cifrado en reposo
+  KMS --- SQS
+  KMS --- DDB
+  KMS --- S3
+
+  %% Estilos
+  classDef lambda fill:#E8FFF0,stroke:#2EA043,stroke-width:2px,color:#111;
+  classDef apigw fill:#FFF7E5,stroke:#C47F00,stroke-width:2px,color:#111;
+  classDef queue fill:#E6F0FF,stroke:#1F6FEB,stroke-width:2px,color:#111;
+  classDef dlq fill:#FFE8E8,stroke:#D1242F,stroke-width:2px,color:#111;
+  classDef db fill:#F1EFFF,stroke:#7B61FF,stroke-width:2px,color:#111;
+  classDef s3 fill:#E7FFF9,stroke:#01A982,stroke-width:2px,color:#111;
+  classDef glue fill:#F7E8FF,stroke:#9D34DA,stroke-width:2px,color:#111;
+  classDef athena fill:#E8F7FF,stroke:#127FBF,stroke-width:2px,color:#111;
+  classDef obs fill:#F2F2F2,stroke:#7A7A7A,stroke-width:2px,color:#111;
+  classDef sec fill:#FFF0F0,stroke:#C93C3C,stroke-width:2px,color:#111;
+  classDef vpc fill:#EEF7FF,stroke:#5184D3,stroke-width:2px,color:#111;
+
 ```
 
 ## 🔄 Flujo de trabajo diario
