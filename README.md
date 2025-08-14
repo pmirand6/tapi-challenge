@@ -201,4 +201,4 @@ GSI1: `provider` → listar por proveedor (para rate limiting específico si se 
 
 ---
 
-**Licencia:** MIT • Autor: Tu Nombre
+**Licencia:** MIT • Autor: Pablo Miranda
