@@ -1,0 +1,21 @@
+%% architecture/diagram.mmd
+flowchart TD
+  subgraph "Scheduling (daily)"
+    SCAN[Step Functions: scan Records (batches)]
+    ENQ[Lambda Scheduler: enqueue to SQS FIFO with delaySeconds, dedupId, groupId=provider]
+    SCAN --> ENQ
+  end
+
+  QUEUE[(SQS FIFO<br/>DLQ, visibilityTimeout, redrive)]
+  ENQ --> QUEUE
+
+  subgraph "Processing"
+    WRK[Lambda Worker]
+    API1[(Internal API - Lambda A)]
+    API2[(Internal API - Lambda B)]
+    DB[(DynamoDB Results)]
+    QUEUE --> WRK
+    WRK --> API1
+    WRK --> API2
+    WRK --> DB
+  end

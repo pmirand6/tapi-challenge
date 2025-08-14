@@ -1,0 +1,13 @@
+{
+  "name": "tapi-challenge",
+  "private": true,
+  "workspaces": [
+    "cdk",
+    "src"
+  ],
+  "scripts": {
+    "lint": "echo 'add eslint here' && exit 0",
+    "build": "echo 'build lambdas (tsc bundling) via esbuild in CDK'",
+    "test": "echo 'add jest tests' && exit 0"
+  }
+}
