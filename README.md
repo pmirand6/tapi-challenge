@@ -17,6 +17,54 @@
 - **Límites relevantes**: SQS admite hasta **256 KB** por mensaje (incluyendo atributos) y DynamoDB hasta **400 KB** por ítem. Si el `body` creciera por encima de ~200 KB, **esta solución debería evolucionar** al *pattern* de **puntero S3** (almacenar el payload en S3 y encolar una referencia). **Este ajuste queda fuera del alcance de este análisis** pero se documenta como *Next Step* recomendado.
 - **Parseo JSON**: se realiza en la Lambda de manera **sincrónica** (`JSON.parse`), aceptando el costo de CPU p95 asociado. Si aparecieran payloads grandes, se deberá: (1) adoptar punteros S3 + *streaming*, o (2) aumentar memoria/CPU y/o usar parseo parcial.
 
+## 📌 Lambdas principales
+
+### [Scheduler Lambda](.src/lambdas/scheduler/README.md)
+- Corre de forma **diaria** (orquestado por AWS Step Functions o EventBridge).
+- Escanea la tabla `Records` en **DynamoDB**.
+- Distribuye los jobs en una cola **SQS FIFO**, aplicando un **spread** (diluir en el tiempo) para no saturar el sistema.
+- Cada mensaje contiene información sobre:
+    - `id` del registro.
+    - `provider` (usado como `MessageGroupId` para evitar concurrencia por proveedor).
+    - `body` y `endpoint` para ser procesados.
+
+👉 [Ver más en el README del Scheduler](.src/lambdas/scheduler/README.md)
+
+---
+
+### [Worker Lambda](.src/lambdas/worker/README.md)
+- Se dispara cuando llegan mensajes a la cola **SQS FIFO**.
+- Invoca un **API Gateway Privado** que enruta hacia **dos Lambdas internas (A y B)**.
+- Llama a ambas en paralelo, maneja **timeouts**, clasifica errores en **retry/no-retry** y persiste resultados en la tabla `Results` de **DynamoDB**.
+- Resiliencia:
+    - Reintenta en caso de errores transitorios (`5xx`, `429`, `Timeout`).
+    - No reintenta en caso de errores de cliente (`4xx`), evitando loops innecesarios.
+
+👉 [Ver más en el README del Worker](.src/lambdas/worker/README.md)
+
+---
+
+## 🏗️ Infraestructura (CDK + Terraform)
+
+- **CDK (Node.js)**:  
+  Define la infraestructura como código. Entre otros recursos:
+    - **DynamoDB** (tablas `Records` y `Results`).
+    - **SQS FIFO + DLQ**.
+    - **API Gateway Privado** (integrado con dos Lambdas internas).
+    - **Step Functions / EventBridge Rule** para el Scheduler.
+    - **Roles IAM** y permisos mínimos necesarios.
+
+- **Terraform**:  
+  Se utiliza para el provisioning de componentes transversales (por ejemplo, VPC, VPC Endpoints, networking).
+
+- **GitHub Actions**:  
+  Pipelines de CI/CD que permiten:
+    - Ejecutar tests.
+    - Desplegar la infraestructura y las Lambdas.
+    - Mantener consistencia entre ambientes (dev, staging, prod).
+
+---
+
 ## 🏗️ Arquitectura de infraestructura
 
 ```mermaid
