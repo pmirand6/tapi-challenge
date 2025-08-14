@@ -19,7 +19,7 @@
 
 ## 📌 Lambdas principales
 
-### [Scheduler Lambda](.src/lambdas/scheduler/README.md)
+### [Scheduler Lambda](src/lambdas/scheduler/README.md)
 - Corre de forma **diaria** (orquestado por AWS Step Functions o EventBridge).
 - Escanea la tabla `Records` en **DynamoDB**.
 - Distribuye los jobs en una cola **SQS FIFO**, aplicando un **spread** (diluir en el tiempo) para no saturar el sistema.
@@ -28,11 +28,11 @@
     - `provider` (usado como `MessageGroupId` para evitar concurrencia por proveedor).
     - `body` y `endpoint` para ser procesados.
 
-👉 [Ver más en el README del Scheduler](.src/lambdas/scheduler/README.md)
+👉 [Ver más en el README del Scheduler](src/lambdas/scheduler/README.md)
 
 ---
 
-### [Worker Lambda](.src/lambdas/worker/README.md)
+### [Worker Lambda](src/lambdas/worker/README.md)
 - Se dispara cuando llegan mensajes a la cola **SQS FIFO**.
 - Invoca un **API Gateway Privado** que enruta hacia **dos Lambdas internas (A y B)**.
 - Llama a ambas en paralelo, maneja **timeouts**, clasifica errores en **retry/no-retry** y persiste resultados en la tabla `Results` de **DynamoDB**.
@@ -40,7 +40,7 @@
     - Reintenta en caso de errores transitorios (`5xx`, `429`, `Timeout`).
     - No reintenta en caso de errores de cliente (`4xx`), evitando loops innecesarios.
 
-👉 [Ver más en el README del Worker](.src/lambdas/worker/README.md)
+👉 [Ver más en el README del Worker](src/lambdas/worker/README.md)
 
 ---
 
